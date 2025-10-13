@@ -89,6 +89,11 @@ app.register_blueprint(exam_questions_bp, url_prefix="/api")
 
 # Register WebRTC endpoints last (organization preference)
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    # Only run Flask's built-in server when developing locally
+    if os.environ.get("RAILWAY_ENVIRONMENT") is None:
+        port = int(os.environ.get("PORT", 5000))
+        app.run(host="0.0.0.0", port=port, debug=True)
+
+
 
 
