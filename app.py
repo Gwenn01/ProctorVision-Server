@@ -55,14 +55,12 @@ from routes.get_exam_routes import get_exam_bp
 from routes.exam_submit_routes import exam_submit_bp
 from routes.behavior_routes import behavior_bp
 from routes.get_behavior_routes import get_behavior_bp
-from routes.classification_routes import classification_bp
 from routes.get_behavior_images import get_behavior_images_bp
 from routes.instructor_student_behavior import instructor_behavior_bp
 from routes.utils.email_verification import email_verification_bp
 from routes.exam_question_routes import exam_questions_bp
 
 # NEW: WebRTC blueprint (streams student camera to server)
-from routes.webrtc_routes import webrtc_bp
 
 app.register_blueprint(create_account_bp, url_prefix='/api')
 app.register_blueprint(auth_bp, url_prefix='/api')
@@ -84,14 +82,12 @@ app.register_blueprint(get_exam_bp, url_prefix='/api')
 app.register_blueprint(exam_submit_bp, url_prefix="/api")
 app.register_blueprint(behavior_bp, url_prefix='/api')
 app.register_blueprint(get_behavior_bp, url_prefix='/api')
-app.register_blueprint(classification_bp, url_prefix='/api')
 app.register_blueprint(get_behavior_images_bp, url_prefix="/api")
 app.register_blueprint(instructor_behavior_bp, url_prefix="/api")
 app.register_blueprint(email_verification_bp, url_prefix="/api")
 app.register_blueprint(exam_questions_bp, url_prefix="/api")
 
 # Register WebRTC endpoints last (organization preference)
-app.register_blueprint(webrtc_bp, url_prefix="/api")
 if __name__ == "__main__":
     import os
     port = int(os.environ.get("PORT", 5000))
