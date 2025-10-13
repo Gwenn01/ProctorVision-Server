@@ -1,0 +1,8 @@
+[build]
+builder = "Dockerfile"
+
+[env]
+PORT = "5000"
+
+[deploy]
+startCommand = "python app.py"
