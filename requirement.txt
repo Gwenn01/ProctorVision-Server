@@ -76,3 +76,4 @@ idna==3.10
 urllib3==2.2.2
 certifi==2025.8.3
 python-dotenv==1.0.1
+
