@@ -1,0 +1,17 @@
+# ignore unnecessary large files
+venv/
+__pycache__/
+node_modules/
+*.mp4
+*.avi
+*.zip
+*.rar
+*.tar
+*.tar.gz
+*.ipynb
+.DS_Store
+.git
+.gitignore
+uploads/
+dataset_split/
+prediction_page_*.png
