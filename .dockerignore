@@ -1,17 +1,29 @@
-# ignore unnecessary large files
+# --- .dockerignore ---
+
+# Virtual environments / temp files
+
 venv/
-__pycache__/
+**pycache**/
+\*.pyc
 node_modules/
-*.mp4
-*.avi
-*.zip
-*.rar
-*.tar
-*.tar.gz
-*.ipynb
-.DS_Store
 .git
 .gitignore
+.DS_Store
+
+# Large or unnecessary files
+
+_.mp4
+_.avi
+_.zip
+_.tar
+_.tar.gz
+_.rar
+_.ipynb
 uploads/
-dataset_split/
-prediction_page_*.png
+dataset*split/
+prediction_page*_.png
+
+# Optional: if models are too large for upload
+
+model/_.keras
+model/_.npy
