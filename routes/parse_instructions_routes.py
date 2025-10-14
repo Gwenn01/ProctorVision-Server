@@ -1,81 +1,93 @@
 # routes/parse_instructions_routes.py
 from flask import Blueprint, request, jsonify
-from werkzeug.utils import secure_filename
+from flask_cors import CORS
 from pypdf import PdfReader
 from docx import Document
-import os, io, tempfile, subprocess
+import io, os
 
+# ---------------------------------------------------------------------
+# Setup Blueprint
+# ---------------------------------------------------------------------
 parse_instructions_bp = Blueprint("parse_instructions", __name__)
-ALLOWED = {".pdf", ".docx", ".txt", ".doc"}  # .doc handled via convert
+CORS(parse_instructions_bp, resources={r"/*": {"origins": "*"}})
 
+# Allowed file types (no external dependencies)
+ALLOWED = {".pdf", ".docx", ".txt"}
+
+# ---------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------
 def _normalize(text: str) -> str:
+    """Normalize line breaks and strip whitespace."""
     return "\n".join((text or "").splitlines()).strip()
 
-def _convert_doc_to_docx(raw_bytes: bytes) -> bytes:
-    """
-    Convert .doc -> .docx using LibreOffice headless.
-    Requires LibreOffice (soffice) installed & on PATH.
-    Returns the new .docx bytes.
-    """
-    with tempfile.TemporaryDirectory() as td:
-        in_path = os.path.join(td, "in.doc")
-        out_dir = td
-        with open(in_path, "wb") as f:
-            f.write(raw_bytes)
 
-        # soffice --headless --convert-to docx --outdir <outdir> <infile>
-        subprocess.run(
-            ["soffice", "--headless", "--convert-to", "docx", "--outdir", out_dir, in_path],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+def _extract_from_docx(raw_bytes: bytes) -> str:
+    """Extract text from DOCX bytes."""
+    try:
+        doc = Document(io.BytesIO(raw_bytes))
+        return "\n".join(p.text for p in doc.paragraphs)
+    except Exception as e:
+        raise ValueError(f"Failed to read DOCX: {e}")
 
-        out_path = os.path.join(td, "in.docx")
-        with open(out_path, "rb") as f:
-            return f.read()
 
+def _extract_from_pdf(raw_bytes: bytes) -> str:
+    """Extract text from PDF bytes."""
+    try:
+        reader = PdfReader(io.BytesIO(raw_bytes))
+        return "\n".join((page.extract_text() or "") for page in reader.pages)
+    except Exception as e:
+        raise ValueError(f"Failed to read PDF: {e}")
+
+
+def _extract_from_txt(raw_bytes: bytes) -> str:
+    """Extract text from TXT bytes."""
+    try:
+        return raw_bytes.decode("utf-8", errors="ignore")
+    except Exception as e:
+        raise ValueError(f"Failed to read TXT: {e}")
+
+
+# ---------------------------------------------------------------------
+# Main route: /parse-instructions
+# ---------------------------------------------------------------------
 @parse_instructions_bp.route("/parse-instructions", methods=["POST"])
 def parse_instructions():
     try:
-        f = request.files.get("file")
-        if not f or not f.filename:
-            return jsonify({"error": "file is required"}), 400
+        file = request.files.get("file")
+        if not file or not file.filename:
+            return jsonify({"error": "No file uploaded."}), 400
 
-        _, ext = os.path.splitext(f.filename)
+        _, ext = os.path.splitext(file.filename)
         ext = ext.lower()
-        if ext not in ALLOWED:
-            return jsonify({"error": f"Unsupported file type: {ext}"}), 415
 
-        raw = f.read()
+        if ext not in ALLOWED:
+            return jsonify({
+                "error": f"Unsupported file type '{ext}'. Please upload PDF, DOCX, or TXT."
+            }), 415
+
+        raw = file.read()
         text = ""
 
-        if ext == ".txt":
-            text = raw.decode("utf-8", errors="ignore")
-
+        # 🧠 Parse based on extension
+        if ext == ".docx":
+            text = _extract_from_docx(raw)
         elif ext == ".pdf":
-            reader = PdfReader(io.BytesIO(raw))
-            text = "\n".join((page.extract_text() or "") for page in reader.pages)
+            text = _extract_from_pdf(raw)
+        elif ext == ".txt":
+            text = _extract_from_txt(raw)
 
-        elif ext == ".docx":
-            doc = Document(io.BytesIO(raw))
-            text = "\n".join(p.text for p in doc.paragraphs)
+        # 🧹 Clean and normalize
+        clean_text = _normalize(text)
+        if not clean_text.strip():
+            return jsonify({"error": "No readable text found in the uploaded file."}), 422
 
-        elif ext == ".doc":
-            # Option A: reject with a clear message
-            # return jsonify({"error": ".doc is not supported; please upload .docx or PDF"}), 415
+        return jsonify({"instructions": clean_text}), 200
 
-            # Option B: auto-convert to docx using LibreOffice, then parse
-            try:
-                docx_bytes = _convert_doc_to_docx(raw)
-                doc = Document(io.BytesIO(docx_bytes))
-                text = "\n".join(p.text for p in doc.paragraphs)
-            except Exception:
-                return jsonify({"error": ".doc conversion failed. Please upload DOCX or PDF."}), 415
+    except ValueError as e:
+        print("⚠️ Parse error:", str(e))
+        return jsonify({"error": str(e)}), 400
 
-        return jsonify({"instructions": _normalize(text)}), 200
-
-    except subprocess.CalledProcessError as e:
-        return jsonify({"error": "Conversion tool not available (LibreOffice). Install it or upload DOCX/PDF."}), 500
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print("❌ Error in parse-instructions:", str(e))
+        return jsonify({"error": "Server error: " + str(e)}), 500

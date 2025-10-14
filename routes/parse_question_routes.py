@@ -1,16 +1,21 @@
 # routes/parse_question_routes.py
 from flask import Blueprint, request, jsonify
+from flask_cors import CORS
 import os, re
+from io import BytesIO
 from werkzeug.utils import secure_filename
 from pypdf import PdfReader
 from docx import Document
 
+# ---------------------------------------------------------------------
+# Blueprint setup
+# ---------------------------------------------------------------------
 parse_question_bp = Blueprint("parse_question", __name__)
+CORS(parse_question_bp, resources={r"/*": {"origins": "*"}})
 
-UPLOAD_FOLDER = "uploads/question_files"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-# Regex patterns
+# ---------------------------------------------------------------------
+# Regex patterns for parsing questions
+# ---------------------------------------------------------------------
 Q_RE = re.compile(r"^\s*(?:q(?:uestion)?\s*\d*[\.\):-]?\s*)(.*)$", re.I)
 OPT_RE = re.compile(r"^\s*([A-D])[\.\)]\s*(.+)$", re.I)
 
@@ -26,6 +31,9 @@ ESSAY_KEYWORDS = [
 ]
 
 
+# ---------------------------------------------------------------------
+# Helper functions
+# ---------------------------------------------------------------------
 def _flush(q, out):
     """Finalize a question and detect its type before appending."""
     if not q:
@@ -109,6 +117,9 @@ def _parse_lines(lines):
     return questions
 
 
+# ---------------------------------------------------------------------
+# Main route: /parse-questions
+# ---------------------------------------------------------------------
 @parse_question_bp.route("/parse-questions", methods=["POST"])
 def parse_questions():
     try:
@@ -117,26 +128,33 @@ def parse_questions():
             return jsonify({"error": "No file uploaded"}), 400
 
         filename = secure_filename(file.filename)
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(filepath)
-
         ext = os.path.splitext(filename)[1].lower()
         lines = []
 
+        # Use in-memory file stream for cloud hosting safety
+        file_stream = BytesIO(file.read())
+
         if ext == ".docx":
-            doc = Document(filepath)
-            lines = [p.text for p in doc.paragraphs]
+            try:
+                doc = Document(file_stream)
+                lines = [p.text for p in doc.paragraphs]
+            except Exception as e:
+                return jsonify({"error": f"Failed to read DOCX file: {str(e)}"}), 500
 
         elif ext == ".pdf":
-            reader = PdfReader(filepath)
-            for page in reader.pages:
-                text = page.extract_text() or ""
-                if text:
-                    lines.extend(text.splitlines())
+            try:
+                reader = PdfReader(file_stream)
+                for page in reader.pages:
+                    text = page.extract_text() or ""
+                    if text:
+                        lines.extend(text.splitlines())
+            except Exception as e:
+                return jsonify({"error": f"Failed to read PDF file: {str(e)}"}), 500
 
         else:
-            return jsonify({"error": "Unsupported file type. Use PDF or DOCX."}), 415
+            return jsonify({"error": "Unsupported file type. Please upload a .PDF or .DOCX file."}), 415
 
+        # Parse the extracted lines
         questions = _parse_lines(lines)
         return jsonify({"questions": questions}), 200
 
