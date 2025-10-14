@@ -21,15 +21,18 @@ app = Flask(__name__)
 # CORS Configuration — allow both local dev and deployed frontends
 CORS(
     app,
-    resources={r"/api/*": {
-        "origins": [
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-            "https://your-frontend-domain.com"
-        ]
-    }},
+    resources={
+        r"/api/*": {
+            "origins": [
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+                "https://proctorvision-client.vercel.app"
+            ]
+        }
+    },
     supports_credentials=True,
 )
+
 
 # JWT Configuration
 app.config["JWT_SECRET_KEY"] = "supersecretkey"
