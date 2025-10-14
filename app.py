@@ -22,11 +22,12 @@ app = Flask(__name__)
 CORS(
     app,
     resources={
-        r"/api/*": {
+        r"/*": {   # ← allow all routes
             "origins": [
                 "http://localhost:3000",
                 "http://127.0.0.1:3000",
-                "https://proctorvision-client.vercel.app"
+                "https://proctorvision-client.vercel.app",
+                r"https://.*\.vercel\.app"
             ]
         }
     },
