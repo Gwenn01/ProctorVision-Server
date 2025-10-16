@@ -27,6 +27,7 @@ CORS(
                 "http://localhost:3000",
                 "http://127.0.0.1:3000",
                 "https://proctorvision-client.vercel.app",
+                "https://gwen01-proctorvision-ai.hf.space",
                 r"https://.*\.vercel\.app"
             ]
         }
@@ -86,7 +87,8 @@ from routes.get_behavior_images import get_behavior_images_bp
 from routes.instructor_student_behavior import instructor_behavior_bp
 from routes.utils.email_verification import email_verification_bp
 from routes.exam_question_routes import exam_questions_bp
-
+from routes.ai_bridge_routes import ai_bridge_bp
+from routes.behavior_sync_routes import behavior_sync_bp
 # -------------------------------------------------------------
 # Register Blueprints with URL Prefixes
 # -------------------------------------------------------------
@@ -112,6 +114,8 @@ app.register_blueprint(get_behavior_images_bp, url_prefix="/api")
 app.register_blueprint(instructor_behavior_bp, url_prefix="/api")
 app.register_blueprint(email_verification_bp, url_prefix="/api")
 app.register_blueprint(exam_questions_bp, url_prefix="/api")
+app.register_blueprint(ai_bridge_bp, url_prefix="/api")
+app.register_blueprint(behavior_sync_bp, url_prefix="/api")
 
 # -------------------------------------------------------------
 # Local Development Entry Point
