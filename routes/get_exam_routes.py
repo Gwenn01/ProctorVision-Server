@@ -17,7 +17,8 @@ def get_exam():
         cursor = conn.cursor(dictionary=True)
         query = """
                     SELECT e.id, e.title, e.description, e.duration_minutes, e.exam_date,
-                        e.start_time, e.exam_file, e.exam_type, e.exam_category
+                        e.start_time, e.exam_file, e.exam_type, e.exam_category,
+                        e.instructor_id 
                     FROM exams e
                     JOIN exam_students es ON e.id = es.exam_id
                     WHERE es.student_id = %s
