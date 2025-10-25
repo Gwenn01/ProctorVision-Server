@@ -89,7 +89,7 @@ def update_exam_status_submit():
             """
             UPDATE instructor_assignments
             SET is_taking_exam = 0,
-                suspicious_behavior_count = 0
+                suspicious_behavior_count = 0,
                 is_other_tab = 0
             WHERE student_id = %s
             """,
