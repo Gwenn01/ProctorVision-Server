@@ -27,6 +27,7 @@ def get_assigned_students_for_exam(exam_id):
                 MAX(ia.is_login) AS is_login,
                 MAX(ia.is_taking_exam) AS is_taking_exam,
                 MAX(ia.suspicious_behavior_count) AS suspicious_behavior_count
+                MAX(ia.is_other_tab) AS is_other_tab
             FROM exam_students es
             JOIN users u ON es.student_id = u.id
             JOIN instructor_assignments ia ON ia.student_id = u.id

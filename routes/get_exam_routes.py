@@ -90,6 +90,7 @@ def update_exam_status_submit():
             UPDATE instructor_assignments
             SET is_taking_exam = 0,
                 suspicious_behavior_count = 0
+                is_other_tab = 0
             WHERE student_id = %s
             """,
             (student_id,)  #  FIXED tuple syntax
@@ -126,7 +127,34 @@ def increment_suspicious():
         return jsonify({"message": "Suspicious behavior count updated."}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    
+
+
+@get_exam_bp.route("/update_tab_status", methods=["POST"])
+def update_tab_status():
+    try:
+        data = request.get_json()
+        student_id = data.get("student_id")
+        instructor_id = data.get("instructor_id")
+        is_other_tab = data.get("is_other_tab", 0)  # 1 = left tab, 0 = on tab
+
+        if not student_id or not instructor_id:
+            return jsonify({"error": "Missing student_id or instructor_id"}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE instructor_assignments
+            SET is_other_tab = %s
+            WHERE student_id = %s AND instructor_id = %s
+        """, (is_other_tab, student_id, instructor_id))
+        conn.commit()
+
+        return jsonify({"message": "Tab status updated successfully"}), 200
+
+    except Exception as e:
+        print("❌ Error updating tab status:", e)
+        return jsonify({"error": str(e)}), 500
  
 
 @get_exam_bp.route('/update_status_timeup', methods=['POST'])
@@ -143,6 +171,7 @@ def update_status_timeup():
             UPDATE instructor_assignments 
             SET is_taking_exam = 0,
                 suspicious_behavior_count = 0
+                is_other_tab = 0
             WHERE student_id = %s
             """,
             (student_id,)
