@@ -5,8 +5,13 @@ from database.connection import get_db_connection
 import bcrypt  
 from routes.utils.email_utils import send_verification_email
 import uuid
+import os
 
 create_account_bp = Blueprint('create_account', __name__)
+
+# Environment-based URLs (fall back to localhost for dev)
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://proctorvision-client.vercel.app")
+BACKEND_URL = os.getenv("BACKEND_URL", "https://proctorvision-server-production.up.railway.app")
 
 @create_account_bp.route("/create_account", methods=["POST"])
 def create_account():
@@ -24,63 +29,81 @@ def create_account():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Check for duplicate username or email
-        cursor.execute("SELECT * FROM users WHERE username = %s OR email = %s", (data['username'], data['email']))
+        # Check for duplicates
+        cursor.execute(
+            "SELECT * FROM users WHERE username = %s OR email = %s",
+            (data["username"], data["email"]),
+        )
         if cursor.fetchone():
             return jsonify({"error": "Username or email already exists"}), 409
 
         raw_password = data["password"]
-        hashed_pw = bcrypt.hashpw(raw_password.encode('utf-8'), bcrypt.gensalt())
+        hashed_pw = bcrypt.hashpw(raw_password.encode("utf-8"), bcrypt.gensalt())
         verify_token = str(uuid.uuid4())
 
-        # Insert new user into the users table
-        cursor.execute("""
+        # Insert into users
+        cursor.execute(
+            """
             INSERT INTO users (name, username, email, password, user_type, verify_token, is_verified)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (
-            data["name"],
-            data["username"],
-            data["email"],
-            hashed_pw,
-            data["userType"],
-            verify_token,
-            False
-        ))
+        """,
+            (
+                data["name"],
+                data["username"],
+                data["email"],
+                hashed_pw,
+                data["userType"],
+                verify_token,
+                False,
+            ),
+        )
 
         new_user_id = cursor.lastrowid
 
-        # If student, insert into student_profiles
+        # If student, insert profile
         if data["userType"].lower() == "student":
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO student_profiles (user_id, course, section, year, status)
                 VALUES (%s, %s, %s, %s, %s)
-            """, (
-                new_user_id,
-                data["course"],
-                data["section"],
-                data["year"],
-                data["status"]
-            ))
+            """,
+                (
+                    new_user_id,
+                    data["course"],
+                    data["section"],
+                    data["year"],
+                    data["status"],
+                ),
+            )
 
         conn.commit()
         conn.close()
 
-        # Compose verification URL
-        verification_url = f"http://localhost:5000/api/verify?token={verify_token}"
+        # ✅ Build live verification URL
+        verification_url = f"{BACKEND_URL}/api/verify?token={verify_token}"
 
-        return jsonify({
-            "message": "Account created successfully.",
-            "token": verify_token,  
-            "user": {
-                "id": new_user_id,
-                "name": data["name"],
-                "username": data["username"],
-                "email": data["email"],
-                "userType": data["userType"]
+        # ✅ Send verification email
+        send_verification_email(
+            to_email=data["email"],
+            name=data["name"],
+            username=data["username"],
+            password="Hidden for security",  # safer
+            verification_url=verification_url,
+        )
+
+        return jsonify(
+            {
+                "message": "Account created successfully. Please check your email for verification.",
+                "token": verify_token,
+                "user": {
+                    "id": new_user_id,
+                    "name": data["name"],
+                    "username": data["username"],
+                    "email": data["email"],
+                    "userType": data["userType"],
+                },
             }
-        }), 201
-
-
+        ), 201
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
