@@ -1,7 +1,6 @@
 from flask import Blueprint, request, jsonify, redirect
 from database.connection import get_db_connection
 import os
-from datetime import datetime, timedelta
 
 email_verification_bp = Blueprint("email_verification", __name__)
 
@@ -15,21 +14,17 @@ def verify_account():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Update the query to include created_at (or equivalent field)
-        cursor.execute("SELECT id, is_verified, created_at FROM users WHERE verify_token = %s", (token,))
+        # Find the user with the provided token
+        cursor.execute("SELECT id, is_verified FROM users WHERE verify_token = %s", (token,))
         user = cursor.fetchone()
 
         if not user:
-            return jsonify({"error": "Invalid or expired token"}), 400
-
-        # Check if token has expired (1-hour expiration time)
-        token_expiration_time = user[2] + timedelta(hours=1)  # user[2] is the created_at field
-        if datetime.now() > token_expiration_time:
-            return jsonify({"error": "Expired token"}), 400
+            return jsonify({"error": "Invalid token"}), 400  # Invalid token
 
         if user[1]:  # already verified
             return redirect(f"{FRONTEND_URL}/verify-already")
 
+        # Update the database to mark the user as verified
         cursor.execute(
             """
             UPDATE users
