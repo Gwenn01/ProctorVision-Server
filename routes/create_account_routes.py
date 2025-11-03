@@ -1,6 +1,4 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import create_access_token
-from datetime import timedelta
 from database.connection import get_db_connection  
 import bcrypt  
 from routes.utils.email_utils import send_verification_email
@@ -39,13 +37,12 @@ def create_account():
 
         raw_password = data["password"]
         hashed_pw = bcrypt.hashpw(raw_password.encode("utf-8"), bcrypt.gensalt())
-        verify_token = str(uuid.uuid4())
 
-        # Insert into users
+        # Insert into users (removed verify_token)
         cursor.execute(
             """
-            INSERT INTO users (name, username, email, password, user_type, verify_token, is_verified)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO users (name, username, email, password, user_type, is_verified)
+            VALUES (%s, %s, %s, %s, %s, %s)
         """,
             (
                 data["name"],
@@ -53,12 +50,11 @@ def create_account():
                 data["email"],
                 hashed_pw,
                 data["userType"],
-                verify_token,
-                False,
+                False,  # is_verified = False by default
             ),
         )
 
-        new_user_id = cursor.lastrowid
+        new_user_id = cursor.lastrowid  # Get the new user ID
 
         # If student, insert profile
         if data["userType"].lower() == "student":
@@ -79,24 +75,22 @@ def create_account():
         conn.commit()
         conn.close()
 
-        # ✅ Build live verification URL
-        verification_url = f"{BACKEND_URL}/api/verify?token={verify_token}"
+        # ✅ Send verification email with user_id in verification URL (removed token)
+        verification_url = f"{BACKEND_URL}/api/verify?user_id={new_user_id}"
 
-        # ✅ Send verification email
         send_verification_email(
             to_email=data["email"],
             name=data["name"],
             username=data["username"],
             password="Hidden for security",  # safer
-            verification_url=verification_url,
+            verification_url=verification_url,  # Use user_id instead of token
         )
 
         return jsonify(
             {
                 "message": "Account created successfully. Please check your email for verification.",
-                "token": verify_token,
                 "user": {
-                    "id": new_user_id,
+                    "id": new_user_id,  # Include the user ID in the response
                     "name": data["name"],
                     "username": data["username"],
                     "email": data["email"],
@@ -144,20 +138,18 @@ def bulk_create_students():
                 continue
 
             hashed_pw = bcrypt.hashpw(raw_password.encode("utf-8"), bcrypt.gensalt())
-            verify_token = str(uuid.uuid4())
 
-            # Insert into users table
-            cursor.execute("""
-                INSERT INTO users (name, username, email, password, user_type, verify_token, is_verified)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            # Insert into users table (no verify_token)
+            cursor.execute(""" 
+                INSERT INTO users (name, username, email, password, user_type, is_verified)
+                VALUES (%s, %s, %s, %s, %s, %s)
             """, (
                 name,
                 username,
                 email,
                 hashed_pw,
                 "Student",
-                verify_token,
-                False
+                False  # is_verified = False by default
             ))
 
             user_id = cursor.lastrowid
@@ -180,11 +172,24 @@ def bulk_create_students():
                 "email": email,
                 "username": username,
                 "password": raw_password,
-                "verify_token": verify_token
+                "user_id": user_id  # Include user_id here
             })
 
         conn.commit()
         conn.close()
+
+        # Send verification email per created student (if backend returns them)
+        if created_students:
+            for student in created_students:
+                verification_url = f"{BACKEND_URL}/api/verify?user_id={student['user_id']}"
+
+                send_verification_email(
+                    to_email=student["email"],
+                    name=student["name"],
+                    username=student["username"],
+                    password="Hidden for security",  # safer
+                    verification_url=verification_url,
+                )
 
         return jsonify({
             "message": f"{len(created_students)} students added.",
