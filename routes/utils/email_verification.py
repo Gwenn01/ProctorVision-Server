@@ -15,14 +15,15 @@ def verify_account():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        cursor.execute("SELECT id, is_verified FROM users WHERE verify_token = %s", (token,))
+        # Update the query to include created_at (or equivalent field)
+        cursor.execute("SELECT id, is_verified, created_at FROM users WHERE verify_token = %s", (token,))
         user = cursor.fetchone()
 
         if not user:
             return jsonify({"error": "Invalid or expired token"}), 400
-        
-        # Check if token has expired (for example, 1 hour expiration)
-        token_expiration_time = user[2] + timedelta(hours=1)  # Assuming created_at is stored as a datetime
+
+        # Check if token has expired (1-hour expiration time)
+        token_expiration_time = user[2] + timedelta(hours=1)  # user[2] is the created_at field
         if datetime.now() > token_expiration_time:
             return jsonify({"error": "Expired token"}), 400
 
